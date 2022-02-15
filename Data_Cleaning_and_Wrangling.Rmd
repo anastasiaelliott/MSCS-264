@@ -1,0 +1,299 @@
+---
+title: "Tidy Data"
+author: "Abby Halverson, Cali Goulet, & Stacie Elliot"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(stringr)
+library(rvest)
+library(httr)
+library(maps) 
+library(ggmap)
+```
+
+```{r, web scraping}
+directory <- read_html("~/Mscs 264 F21/Project/Cali, Abby, & Stacie/search.html")
+
+#This is the link we used scrape our data. When we just used the link it wouldn't run because you have to login to the site to see the info, so Cali saved the site as an html so we could scrape data from it. To pick of student info from the directory, we went into advanced search and searched "Student" in the title. This did result in some non-students, like Student Life Coordinators, ect., that we had to remove from our dataset later on. 
+
+majors <- html_text2(html_elements(directory, ".c-faculty__departments, .c-faculty__email"))
+
+pronouns <- html_text2(html_elements(directory, ".h3 , .c-faculty__email"))
+
+class_year <- html_text2(html_elements(directory, ".c-faculty__title , .c-faculty__email"))
+
+hometown <- html_text2(html_elements(directory, ".icon-letter+ :nth-child(2)"))
+
+dorm <- html_text2(html_elements(directory, ".c-faculty__contact-group .c-faculty__location, .c-faculty__email"))
+
+email <- html_text2(html_elements(directory, " .c-faculty__email"))
+
+#The code above pulls out each piece of data we want to include (the email is included in each data set so we can use it as a key later on).
+```
+
+```{r}
+#This is our list of majors, housing options, and pronouns that we use later on to detect an option in from the lists. 
+
+major <- c("American Studies", "Ancient Studies", "Art History", "Asian Studies", "Biology", "Chemistry", "Chinese", "Church Music", "Classics", "Composition", "Computer Science", "Creative Writing", "Dance", "Economics", "Education", "Elective Studies", "English", "Environmental Studies", "Exercise Science", "Film and Media Studies", "French", "Gender & Sexuality Studies", "German", "Greek", "History", "Individual Major", "Japanese", "Kinesiology", "Latin", "Latin American Studies", "Mathematics", "Medieval Studies", "Music", "Music Education", "Nordic Studies", "Norwegian", "Nursing", "Performance", "Philosophy", "Physics", "Political Science", "Psychology", "Quantitative Economics", "Race and Ethnic Studies", "Religion", "Russian", "Russian Area Studies", "Social Studies Education", "Social Work", "Sociology/Anthropology", "Spanish", "Studio Art", "Theater")
+
+major_options <- str_c(major, collapse = "|")
+
+housing <- c("Ellingson Hall", "Hilleboe Hall", "Kittelsby Hall", "Hoyme Hall", "Kildahl Hall", "Larson Hall", "Mellby Hall", "Mohn Hall", "Rand Hall", "Thorson Hall", "Ytterboe Hall", "Off Campus", "Swanson House", "Rose House", "Haldorsen House", "Finholt House", "Holstad House", "Porter House", "Johnson House", "Bly House", "Lincoln Inn", "Lincoln Manor")
+
+honor_houses <- c("Swanson House", "Rose House", "Haldorsen House", "Finholt House", "Holstad House", "Porter House", "Johnson House", "Bly House", "Lincoln Inn", "Lincoln Manor")
+
+honor_house_options <- str_c(honor_houses, collapse = "|")
+
+housing_options <- str_c(housing, collapse = "|")
+
+pronoun_string <- unique(str_extract(pronouns, "\\(.*\\)"))
+
+pronouns_list <- c("(she, her, hers)","(he, him, his / no pronouns)","(he, him, his)", "(they, them, theirs)","(he, him, his / they, them, theirs)", "(she, her, hers / they, them, theirs)", "(no pronouns)","(she, her, hers / no pronouns)", "(they, them, theirs / she, her, hers)", "(they, them, theirs / he, him, his)", "(he, him, his / she, her, hers)", "(she, her, hers / he, him, his)", "(they, them, theirs / no pronouns)", "(no pronouns / they, them, theirs)", "(they, them, theirs / ze, hir, hirs)")
+
+pronoun_options <- str_c(pronouns_list, collapse = "|")
+```
+
+```{r, Majors}
+majors_tib <- as.tibble(majors)
+
+#"add_majors" is a function that for each row tells you that rows major 
+
+#If the next row contains an @ (which only the emails do), it know that that student hasn't declared a major and lists it as "Undecided." If it doesn't see an @ in the next row, then it lists the next row.
+
+add_majors <- function(x) {
+  if (str_detect(majors_tib[x+1,1], "@")) {
+    "Undecided"} 
+  else {majors_tib[x+1,1]}} 
+
+majors_tibble <- tibble(email = character(), majors_name = character())
+
+for(i in c(1:4966)) {
+  majors_tibble[i,1] <- majors_tib[i,1]
+  majors_tibble[i,2] <- add_majors(i)}
+
+#We used iteration to fill in our majors tibble. The first column includes everything in "majors_tib", and the second column is the output of our "add_majors" function. 
+
+majors_tibble <- majors_tibble %>%
+  filter(str_detect(email, "@"))
+
+#"majors_tibble" contained rows that we didn't want included, so we filtered for @ in the email column to remove majors from the emails.
+```
+
+```{r, Dorm, warning = FALSE}
+dorm_tib <- as.tibble(dorm)
+
+add_dorms <- function(x) {
+  if (str_detect(dorm_tib[x-1,1], housing_options)) {
+    dorm_tib[x-1,1]} 
+  else {"NA"}} 
+
+#The "add_dorm" function takes the previous line of code, and checks for a housing option. If it doesn't see one, the ouput is NA. 
+
+dorm_tibble <- tibble(email = character(), housing = character())
+
+for(i in c(1:5759)) {
+  dorm_tibble[i,1] <- dorm_tib[i,1]
+  dorm_tibble[i,2] <- add_dorms(i)}
+
+#In the iteration to create our tibble, the first column is just every row in "dorm_tib", and the second column is the "add_dorms" function to add a dorm to each email. 
+
+dorm_tibble <- dorm_tibble %>%
+  filter(str_detect(email, "@"))
+
+#To clean up the "dorm_tibble", we once again filter for emails in the email column, and thereby remove any dorms in the email column. 
+```
+
+```{r, Pronouns, warning = FALSE}
+pronouns_tib <- as.tibble(pronouns)
+
+add_pronouns <- function(x) {
+  if (str_detect(pronouns_tib[x-1,1], pronoun_options)) {
+    pronouns_tib[x-1,1]}
+  else {"NA"}} 
+
+#The "add_pronouns" function checks the previous row for pronoun options, and if it doesn't see any it spits out NA. 
+
+pronouns_tibble <- tibble(email = character(), pronouns = character())
+
+for(i in c(1:5988)) {
+  pronouns_tibble[i,1] <- pronouns_tib[i,1]
+  pronouns_tibble[i,2] <- add_pronouns(i)}
+ 
+pronouns_tibble <- pronouns_tibble %>%
+  filter(str_detect(email, "@"))
+```
+
+```{r, Hometown, include = FALSE}
+hometown_tib <- as.tibble(hometown)
+
+#"add_hometown" prints out the next line if it isn't an email. If it is an email, it prints NA. 
+
+add_hometown <- function(x) {
+  if (!str_detect(hometown_tib[x+1,1], "@")) {
+    hometown_tib[x+1,1]} 
+  else {"NA"}} 
+
+hometown_tibble <- tibble(email = character(), hometown = character())
+
+for(i in c(1:5756)) {
+  hometown_tibble[i,1] <- hometown_tib[i,1]
+  hometown_tibble[i,2] <- add_hometown(i)}
+
+hometown_tibble <- hometown_tibble %>%
+  filter(str_detect(email, "@"))
+```
+
+```{r, class year}
+class_year_tib <- as.tibble(class_year)
+
+class_year_tibble <- tibble(email = character(), class_year_name = character())
+
+#"add_class_year" checks the previous row for a 21, 22, 23, 24, or 25 and lists those numbers if it sees them, and if it doesn't it lists "Not student". 
+
+add_class_year <- function(x) {
+  if (str_detect(class_year_tib[x-1,1], "2(1|2|3|4|5)$")) {
+    str_extract(class_year_tib[x-1,1], "2(2|3|4|5)$")} 
+  else {"Not student"}} 
+
+for(i in c(1:5988)) {
+  class_year_tibble[i,1] <- class_year_tib[i,1]
+  class_year_tibble[i,2] <- add_class_year(i)}
+
+class_year_tibble <- class_year_tibble %>%
+  filter(str_detect(email, "@"))
+```
+
+```{r, Tibble, warning = FALSE}
+#In this, we take our tibbles and combine them to create our full dataset using the emails as the key. 
+
+full_tibble <- left_join(pronouns_tibble, majors_tibble) %>%
+  left_join(hometown_tibble) %>%
+  left_join(dorm_tibble) %>%
+  left_join(class_year_tibble) %>%
+  select(-email) %>%
+  mutate(just_pronouns = as.character(str_extract_all(pronouns,
+                                                      pronoun_options)))%>%
+  mutate(just_pronouns = ifelse(str_detect(just_pronouns, "character"), 
+                                NA, 
+                                just_pronouns)) %>%
+  
+#When we extracted the pronouns, if there weren't any listed we got character(0) as the output. This line replaces those with an NA if it sees it.
+  
+  select(-pronouns) %>%
+  separate(majors_name, into = c("major1", "major2", "major3"), sep = "\n") %>%
+  filter(!str_detect(class_year_name, "Not student")) %>%
+  rename(class_year = class_year_name,
+         pronouns = just_pronouns) %>%
+  mutate(major1 = ifelse(major1 == "Women's and Gender Studies", "Gender & Sexuality Studies", major1),
+         major2 = ifelse(major2 == "Women's and Gender Studies", "Gender & Sexuality Studies", major2),
+         major3 = ifelse(major3 == "Women's and Gender Studies", "Gender & Sexuality Studies", major3))
+
+#These three lines account for the two name options in the GSS major, and make them all into Gender & Sexuality Studies. 
+
+full_tibble <- full_tibble %>%
+  mutate(housing = ifelse(housing == "NA", NA, housing),
+         country = ifelse(str_detect(hometown, "NA"), NA, 
+                        ifelse(str_detect(hometown, "United States"), "Domestic", "International")), 
+         state = ifelse(str_detect(full_tibble$hometown, "United States"),
+                                 str_extract(full_tibble$hometown, "[A-Z]{2}( \\d{5}-\\d{4})?\nUnited States"), NA)) %>%
+  separate(state, into = c("state", "extra"), sep = "[ \n]") %>%
+  select(-c(extra, hometown))
+
+#State looks for people that live in the US, then picks off the two digit state label, the zip code, and the country. Zip codes can be five digits, or five digits followed by a dash and four more digits, so we had to account for both options.We then separated at the \n to get just the states, and removed the hometown and extra columns. 
+```
+
+```{r, Region}
+region <- 
+  tibble(state = c("IA", "IL", "IN", "KS", "MI", "MN", "MO", "ND", "NE", "OH", "SD", "WI", "CT", "DE", "MA", "MD", "ME", "NH", "NJ", "NY", "PA", "RI", "VT", "AL", "AR", "FL", "GA", "KY", "LA", "MS", "NC", "SC", "TN", "VA", "WV", "AZ", "NM", "OK", "TX", "AK", "CA", "CO", "HI", "ID", "MT", "NV", "OR", "UT", "WA", "WY"),
+         region = c(rep("Midwest", 12), rep("Northeast", 11), rep("Southeast", 12), rep("Southwest", 4), rep("West", 11))) %>%
+  arrange(state)
+
+full_tibble <- left_join(full_tibble, region)
+
+#This chunk joins the regions to the full tibble.
+```
+
+```{r}
+major_field <- 
+  tibble(major = c("Church Music","Composition", "Elective Studies", "Music", "Music Education", "Performance", "Biology", "Chemistry", "Computer Science", "Environmental Studies", "Kinesiology", "Mathematics", "Nursing", "Physics", "Quantitative Economics", "Economics", "Gender & Sexuality Studies", "American Studies", "Political Science", "Psychology", "Race and Ethnic Studies", "Sociology/Anthropology", "Social Work", "Ancient Studies", "Art History", "Asian Studies", "Chinese", "Classics", "Dance", "Education", "English", "Film and Media Studies", "French", "German", "Greek", "History", "Japanese", "Latin", "Latin American Studies", "Medieval Studies",  "Norwegian", "Philosophy", "Religion", "Russian", "Russian Area Studies", "Social Studies Education", "Spanish", "Studio Art", "Theater"),
+         field = c(rep("music", 6), rep("stem", 9), rep("social_science", 8), rep("humanities", 26))) %>%
+  arrange(major)
+
+#This chunk assigns each major a field:
+
+#stem <- c("Biology", "Chemistry", "Computer Science", "Environmental Studies", "Kinesiology", "Mathematics", "Nursing", "Physics", "Quantitative Economics")
+
+#social_science <- c("Economics", "Gender & Sexuality Studies", "American Studies", "Psychology", "Political Science", "Race and Ethnic Studies", "Sociology/Anthropology", "Social Work")
+
+#humanities <- c("Ancient Studies", "History", "Art History", "Asian Studies", "Chinese", "Classics", "Dance", "Education", "English", "Film and Media Studies", "French", "German", "Greek", "Japanese", "Latin","Latin American Studies", "Medieval Studies", "Music", "Norwegian", "Philosophy", "Religion","Russian","Russian Area Studies","Social Studies Education", "Spanish","Studio Art","Theater")
+
+#music <- c("Church Music","Composition", "Elective Studies","Music Education", "Performance")
+
+full_tibble <- full_tibble %>%
+  left_join(major_field, by = c("major1" = "major")) %>%
+  left_join(major_field, by = c("major2" = "major")) %>%
+  left_join(major_field, by = c("major3" = "major")) %>%
+  rename(field1 = field.x,
+         field2 = field.y,
+         field3 = field) %>%
+  mutate(housing = ifelse(str_detect(housing, honor_house_options),
+                          "Honor/Language House", 
+                          housing)) %>%
+
+#We grouped all the honor & language houses together under one banner. 
+  
+  separate(pronouns, into = c("pronouns1", "pronouns2"), sep = '",') %>%
+  mutate(pronouns1 = ifelse(str_detect(pronouns1, "c"), str_sub(pronouns1, 4, -1), pronouns1), 
+         pronouns2 = str_sub(pronouns2, 3, -3)) %>%
+  mutate(pronouns2 = ifelse(pronouns1 == "he, him, his / no pronouns", "no pronouns", pronouns2),
+         pronouns1 = ifelse(pronouns1 == "he, him, his / no pronouns", "he, him, his", pronouns1))
+```
+
+```{r}
+write.csv(full_tibble, "~/Mscs 264 F21/Project/Cali, Abby, & Stacie/directory_data.csv", row.names = FALSE)
+
+#This chunk makes our full tidy dataset into a csv. 
+```
+
+```{r}
+us_states <- map_data("state")
+
+us_states1<- us_states%>%
+  filter(!str_detect(region, "district"))
+
+#We removed the District of Columbia. 
+
+state_abbr <- function(x) {
+  if (!str_detect(us_states1$region[x], "^virginia$")) 
+    state.abb[grep(str_to_title(str_extract(us_states1$region[x], "(.)*")), state.name)]
+    else
+      str_replace(us_states1$region[x], "^virginia$", "VA")}
+
+#In "us_states", the states are in the full written name, not the two letter abbreviation, so we used this function to address that. Virginia has two abbreviations: WV #and VA, so if we detected something that started and ended in "virginia", the abbreviation was made into VA. For everything else, we used "state.abb[ggrep]" to get the abbreviation. 
+
+states_tibble <- tibble(long = double(), lat = double(), group = double(), order = integer(),  region = character(), state = character() )
+
+for(i in c(1:15527)) {
+  states_tibble[i,1] <- us_states1[i,1]
+  states_tibble[i,2] <- us_states1[i,2] 
+  states_tibble[i,3] <- us_states1[i,3] 
+  states_tibble[i,4] <- us_states1[i,4] 
+  states_tibble[i,5] <- us_states1[i,5] 
+  states_tibble[i,6] <- state_abbr(i)}
+
+states_tibble <- states_tibble %>%
+  rename(abbr = state,
+         state = region)
+
+#We made the state stuff into a new tibble using iteration to add in the abbreviated state name so that we can make a map of the states. 
+```
+
+```{r}
+write.csv(states_tibble, "~/Mscs 264 F21/Project/Cali, Abby, & Stacie/states.csv", row.names = FALSE)
+
+#This chunk makes the states tibble in a csv file. 
+```

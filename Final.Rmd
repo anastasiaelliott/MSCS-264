@@ -1,0 +1,777 @@
+---
+title: "Shiny"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard: 
+  theme: journal 
+  vertical_layout: scroll
+---
+
+<style>      
+
+
+.navbar {
+  background-color:#616161;
+  border-color:black;
+}
+.navbar-brand {
+color:black;
+}
+
+</style>   
+
+
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggmap)
+library(maps)
+library(plotly)
+```
+
+```{r, include = FALSE}
+directory_data <- read_csv("directory_data.csv")
+
+states <- read_csv("states.csv")
+
+color_scheme <- c("#242121", "#616161", "#DE9F00", "#FFD15C", "#C5E0DB", "#DEDEDE", "#CCCCCC", "#2F374A", "#FFFFFF")
+
+#black, dark gray, yellow, light yellow, light blue/gray, light gray, navy blue, white
+
+color1 <- c("#DE9F00")
+color2 <- c("#DE9F00", "#616161")
+color4 <- c('#DE9F00', '#616161', '#FFD15C', '#DEDEDE')
+colfunc <- colorRampPalette(c("#FFD15C", "#DE9F00", "#DEDEDE", "#616161"))
+colfunc2 <- colorRampPalette(c("#DE9F00", "#FFD15C", "#DEDEDE", "#2F374A"))
+colfunc3 <- colorRampPalette(c("#FFFFFF", "#DE9F00", "#616161"))
+
+#We created a few different color schemes to use for our project that match the St. Olaf colors.
+```
+
+```{r, include = FALSE}
+directory_data <- directory_data %>%
+  mutate(gender = ifelse(is.na(pronouns1), NA, 
+                         ifelse(is.na(pronouns2), pronouns1, "they/them or multiple"))) %>%
+  mutate(gender = ifelse(is.na(gender), NA,
+                         ifelse(gender == "he, him, his", "he/him",
+                                ifelse(gender == "she, her, hers", "she/her", "they/them or multiple"))))
+
+#We took the pronoun variables and put the back into one variable that is more consise.
+```
+
+```{r, include = FALSE}
+directory2 <- directory_data %>%  
+  pivot_longer(cols = c(major1, major2, major3), names_to = "major_type", values_to = "major")
+
+#We created this dataset to add up the total number of each major.
+
+directory3 <- directory_data %>%
+  pivot_longer(cols = c(field1, field2, field3), names_to = "field_type", values_to = "field")
+
+#We created this dataset to add up the total number of each major field.
+```
+
+```{r, include = FALSE}
+stem <- c("Biology", "Chemistry", "Computer Science", "Environmental Studies", "Kinesiology", "Mathematics", "Nursing", "Physics", "Quantitative Economics", "Exercise Science")
+
+stem_options <- str_c(stem, collapse = "|")
+
+social_science <- c("Economics", "Gender & Sexuality Studies", "American Studies", "Political Science", "Race and Ethnic Studies", "Sociology/Anthropology", "Social Work", "Psychology")
+
+social_options <- str_c(social_science, collapse = "|")
+
+humanities <- c("Ancient Studies", "History", "Art History", "Asian Studies", "Chinese", "Classics", "Creative Writing", "Dance", "Education", "English", "Film and Media Studies", "French", "German", "Greek", "Japanese", "Latin","Latin American Studies", "Medieval Studies", "Music", "Norwegian", "Philosophy", "Religion","Russian","Russian Area Studies","Social Studies Education", "Spanish","Studio Art","Theater")
+
+humanities_options <- str_c(humanities, collapse = "|")
+
+music <- c("Church Music","Composition", "Elective Studies","Music Education", "Performance")
+
+music_options <- str_c(music, collapse = "|")
+
+#These are the various major fields that needed to be loaded in for one of the later plots.
+```
+
+About
+==========================
+
+### Examination of the Relationship Between Pronouns and Major Load at St. Olaf
+
+##### Cali Goulet, Abby Halverson, & Stacie Elliott
+
+```{r, echo = FALSE, out.width = '25%'}
+knitr::include_graphics("cali.png")
+
+knitr::include_graphics("abby.png")
+
+knitr::include_graphics("stacie.png")
+
+#Here we add in our directory information that we screenshotted.
+```
+
+#### Research Questions
+
++ Are there differences in terms of pronoun usage between students that have one area of study and students that have multiple areas of study?
++ Within double or triple majors, is there a relationship between areas of study and pronoun usage? 
+
+#### Data
+
++ [St. Olaf Directory](https://www.stolaf.edu/directory/search) 
++ [Data dictonary](https://docs.google.com/document/d/1bw_o5U1MfOl7Z5wy3FCvWW0kUW8YB2oTGe5K8Ez16V0/edit?usp=sharing)
+
+#### Methods
+
++ We examine the data scraped from the St. Olaf student directory to explore the various relationships between pronouns, majors, major load, and housing. 
++ We decided to say "pronouns used" versus gender throughout this project. Often, we tend to conflate pronouns used with gender. We assume that all people who use she/her/hers pronouns are women, that all people who use they/them/theirs are non-binary, etc. To help combat this understandable, but ultimately incorrect, conflation of pronouns and gender identity, we will be saying pronouns used over the course of this analysis.
+
+#### Limitations
+
++ There are some students that don't have any information on the directory, but we estimate that this is only a few people, so there shouldn't be a large effect on our findings. 
++ There is no information on student concentrations on the directory. 
++ Many students don't have their pronouns listed on the directory, so to partially address this limitation, we included the NA's within our pronoun data. 
++ Other information such as address and dorm can also be removed from the directory, so our data in those areas is also limited. However, major information cannot be removed from the directory so the data in that area is extensive. 
+
+#### Implications
+
++ In the future, it would be interesting to expand our research by including concentration information in order to get a better understanding of the relationship between pronoun usage and major load at St. Olaf.
+
+---------------------------------------------------------------------------------------------
+*Notes:*
+
+[Update your directory information here!](https://www.stolaf.edu/stofaces/index.cfm?fuseaction=privacy)
+
+[Update you pronouns through SIS under the "Personal" tab!](https://sis.stolaf.edu/sis/landing-page.cfm)
+
+
+
+---------------------------------------------------------------------------------------------
+
+column{data-width=600}
+-------------------------
+
+Student Demographics
+==========================
+
+column{data-width=300}
+-------------------------
+
+```{r, echo = FALSE}
+directory_data %>%
+  group_by(gender) %>%
+  mutate(gender = ifelse(is.na(gender), "NA", gender),
+         gender = ifelse(gender == "she/her", "She/her", gender),
+         gender = ifelse(gender == "he/him", "He/him", gender),
+         gender = ifelse(gender == "they/them or multiple pronouns", "They/them or Multiple Pronouns", gender)) %>%
+  summarize(n = n()) %>%
+  plot_ly(labels = ~gender, 
+          values = ~n, 
+          type = 'pie', 
+          textposition = 'inside',
+          textinfo = 'label',
+          insidetextfont = list(color = '#242121'),
+          hoverinfo = 'label + n',
+          marker = list(colors = color4),
+          showlegend = FALSE) %>%
+    layout(title = 'Student Pronouns',
+           xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+           yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+#This code creates a pie chart looking at the breakdown of student's pronouns.
+```
+
+```{r, echo = FALSE}
+directory_data %>%
+  group_by(class_year) %>%
+  mutate(class_year = ifelse(class_year == 22, 2022, class_year),
+         class_year = ifelse(class_year == 23, 2023, class_year),
+         class_year = ifelse(class_year == 24, 2024, class_year),
+         class_year = ifelse(class_year == 25, 2025, class_year)) %>%
+  summarize(n = n()) %>%
+  plot_ly(labels = ~class_year, 
+          values = ~n, 
+          type = 'pie', 
+          textposition = 'inside',
+          textinfo = 'label',
+          insidetextfont = list(color = '#242121'),
+          hoverinfo = 'label + n',
+          marker = list(colors = color4),
+          showlegend = FALSE) %>%
+    layout(title = 'Student Class Years',
+           xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+           yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+#This code creates a pie chart looking at the breakdown of student's class years.
+```
+
+These summaries show that a very large portion of students don't have their pronouns listed on the directory (35.1%). Of the people that do have their pronouns listed, most of them use she/her. Only about 5.35% of students use they/them or some combination of pronouns.
+
+column{data-width=300}
+-------------------------
+
+```{r, echo = FALSE}
+directory_data %>%
+  group_by(country) %>%
+  mutate(country = ifelse(is.na(country), "NA", country)) %>% 
+  summarize(n = n()) %>%
+  plot_ly(labels = ~country, 
+          values = ~n, 
+          type = 'pie', 
+          textposition = 'inside',
+          textinfo = 'label',
+          insidetextfont = list(color = '#242121'),
+          hoverinfo = 'label + n',
+          marker = list(colors = colfunc(3)),
+          showlegend = FALSE) %>%
+    layout(title = 'International vs Domestic Status',
+           xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+           yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+#This code creates a pie chart looking at the breakdown of student's domestic or international status.
+```
+
+```{r, echo = FALSE}
+directory_data %>%
+  group_by(region) %>%
+  mutate(region = ifelse(is.na(region), "NA", region)) %>%
+  summarize(n = n()) %>%
+  plot_ly(labels = ~region, 
+          values = ~n, 
+          type = 'pie', 
+          textposition = 'inside',
+          textinfo = 'label',
+          insidetextfont = list(color = '#242121'),
+          hoverinfo = 'label + n',
+          marker = list(colors = colfunc(6)),
+          showlegend = FALSE) %>%
+    layout(title = 'Domestic Student Home Region',
+           xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+           yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+#This code creates a pie chart looking at the breakdown of student's home region.
+```
+
+```{r, echo = FALSE, message = FALSE}
+directory_data %>%
+  group_by(state) %>%
+  filter(!is.na(state)) %>%
+  summarize(n = n()) %>%
+  plot_ly(labels = ~state, 
+          values = ~n, 
+          type = 'pie', 
+          textposition = 'inside',
+          textinfo = 'label',
+          insidetextfont = list(color = '#242121'),
+          hoverinfo = 'label + n',
+          marker = list(colors = colfunc(50)),
+          showlegend = FALSE) %>%
+    layout(title = 'Domestic Student Home State',
+           xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+           yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+#This code creates a pie chart looking at the breakdown of student's home state.
+```
+
+International students, or students without their information on the directory are not included in this graph.
+
+Major Fields
+==========================
+
+column{data-width = 200}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Double or Triple Major Field of Study", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(selectInput("major_b", 
+                       label = "Major",
+                       choices = c("American Studies", "Ancient Studies", "Art History", "Asian Studies", "Biology", "Chemistry", "Chinese", "Church Music", "Classics", "Composition", "Computer Science", "Creative Writing", "Dance", "Economics", "Education", "Elective Studies", "English", "Environmental Studies", "Exercise Science", "Film and Media Studies", "French", "Gender & Sexuality Studies", "German", "Greek", "History", "Individual Major", "Japanese", "Kinesiology", "Latin", "Latin American Studies", "Mathematics", "Medieval Studies", "Music", "Music Education", "Nordic Studies", "Norwegian", "Nursing", "Performance", "Philosophy", "Physics", "Political Science", "Psychology", "Quantitative Economics", "Race and Ethnic Studies", "Religion", "Russian", "Russian Area Studies", "Social Studies Education", "Social Work", "Sociology/Anthropology", "Spanish", "Studio Art", "Theater"), 
+                       selected = "Mathematics"))
+
+#Here we created a dropdown menu where you can chose which major to look at. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+  counts <- directory_data %>%
+    filter(input$major_b == major1 | input$major_b == major2 | input$major_b == major3) %>%
+    pivot_longer(cols = c(major1, major2, major3), names_to = "one_two_three", values_to = "major_long") %>%
+    filter(!is.na(major_long), major_long != input$major_b) %>%
+    group_by(major_long) %>%
+    count()
+  
+#The above code removes all observations pertaining to single majors.
+  
+  directory_data %>%
+    filter(input$major_b == major1 | input$major_b == major2 | input$major_b == major3) %>%
+    pivot_longer(cols = c(major1, major2, major3), names_to = "one_two_three", values_to = "major_long") %>%
+    filter(!is.na(major_long), major_long != input$major_b) %>%
+    mutate(field = ifelse(str_detect(major_long, stem_options), "STEM",
+                        ifelse(str_detect(major_long, social_options), "Social Science",  ifelse(str_detect(major_long, humanities_options), "Humanities", "Music")))) %>%
+    left_join(counts) %>%
+    unite(major_long_number, major_long, n, sep = " " ) %>%
+    group_by(field) %>%
+    ggplot() +
+      geom_bar(aes(x = field, fill = major_long_number)) + 
+      labs(x = "Field", 
+           y = "Number of Students", 
+           fill = "Major") +
+      scale_fill_manual(values = colfunc2(27)) +
+      theme_bw() +
+      theme(plot.caption = element_text(hjust = 0.5))})
+
+#This code creates a bar chart looking at the number of each major combination.
+```
+
+Play around and see what other people in your major are studying!
+
+This plot shows the various major combinations broken down by field. Pick a major, and the graph will show you which secondary of tertiary field is most often paired with that major, as well as the number of students with that combination. For example, from this plot we can see that there are almost 80 Mathematics majors that have another stem major, with 26 of them being Computer Science majors.
+
+column{data-width = 200}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Most Popular Majors", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(sliderInput("n_adjust", label = "Top Majors",
+              min = 1, max = 50, value = 6, step = 1), 
+           radioButtons("rb", "Major Load", c("Most Popular Majors" = "normal",
+                 "Most Popular Double & Triple Majors" = "multiple")))
+
+#Here we created a sliding scale where you can chose which how many majors to look at. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+  if(input$rb == "normal")
+  directory2 %>%
+    group_by(major) %>%
+    filter(!major == "Undecided", !is.na(major)) %>%
+    summarize(n = n()) %>%
+    arrange(desc(n)) %>%
+    slice_head(n = input$n_adjust) %>%
+    ggplot(aes(x = n, y = fct_reorder(major, n), fill = "color")) +
+      geom_col() +
+      labs(x = "Number of Students",
+           y = "Major") +
+      scale_fill_manual(values = c("#DE9F00")) +
+      theme_bw() +
+      theme(legend.position = "none")
+else if (input$rb == "multiple")
+    directory_data %>%
+    filter(!is.na(major2)) %>%
+    pivot_longer(cols = c(major1, major2, major3), names_to = "major_type", values_to = "major") %>%
+    filter(!is.na(major)) %>%
+    group_by(major) %>%
+    summarize(n = n()) %>%
+    arrange(desc(n)) %>%
+    slice_head(n = input$n_adjust) %>%
+    ggplot(aes(x = n, y = fct_reorder(major, n), fill = "color")) +
+      geom_col() +
+      labs(x = "Number of Students",
+           y = "Major") +
+      scale_fill_manual(values = color1) +
+      theme_bw() +
+      theme(legend.position = "none", 
+            plot.caption = element_text(hjust = 0.5))})
+
+#This code creates a bar chart looking at the number of students in each major.
+```
+
+By clicking 'Double Majors', you can see that majors that is most common in double/triple major combinations.
+
+The top three majors are Biology, Psychology, Mathematics, in that order. However, among students with more than one major, the top three majors are Mathematics, Biology, and Political Science. 
+
+Pronouns & Majors
+==========================
+
+column{data-width = 500}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Pronouns Used by Each Major", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(selectInput("major", 
+                       label = "Major",
+                       choices = c("American Studies", "Ancient Studies", "Art History", "Asian Studies", "Biology", "Chemistry", "Chinese", "Church Music", "Classics", "Composition", "Computer Science", "Creative Writing", "Dance", "Economics", "Education", "Elective Studies", "English", "Environmental Studies", "Exercise Science", "Film and Media Studies", "French", "Gender & Sexuality Studies", "German", "Greek", "History", "Individual Major", "Japanese", "Kinesiology", "Latin", "Latin American Studies", "Mathematics", "Medieval Studies", "Music", "Music Education", "Nordic Studies", "Norwegian", "Nursing", "Performance", "Philosophy", "Physics", "Political Science", "Psychology", "Quantitative Economics", "Race and Ethnic Studies", "Religion", "Russian", "Russian Area Studies", "Social Studies Education", "Social Work", "Sociology/Anthropology", "Spanish", "Studio Art", "Theater"), 
+                       selected = "Mathematics"),
+           checkboxInput("check", "Percentage", value = FALSE ))
+
+#Here we created a dropdown menu where you can chose which major to look at. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+  if(!input$check)
+    directory2 %>%
+      group_by(major, gender) %>%
+      filter(major == input$major) %>%
+      summarize(n = n()) %>%
+      ggplot(aes(x = major, y = n, fill = gender)) +
+        geom_col(position = "dodge") +
+        labs(x = "Major",
+             y = "Number of Students",
+             fill = "Pronouns Used") + 
+        scale_fill_manual(values = c("#DE9F00", "#616161", "#FFD15C", "#CCCCCC")) +
+        theme_bw() +
+        theme(legend.position = "bottom", 
+              legend.title = element_blank())
+  else if(input$check)
+    directory2 %>%
+      group_by(major, gender) %>%
+      filter(major == input$major) %>%
+      summarize(n = n()) %>%
+      ggplot(aes(x = major, y = (n / sum(n)), fill = gender)) +
+        geom_col(position = "dodge") +
+        labs(x = "Major",
+             y = "Percentage of Students",
+             fill = "Pronouns Used") + 
+        scale_y_continuous(labels = scales::percent) +
+        scale_fill_manual(values = c("#DE9F00", "#616161", "#FFD15C", "#CCCCCC")) +
+        theme_bw() +
+        theme(legend.position = "bottom", 
+              legend.title = element_blank())
+  })
+
+#This code creates a bar chart looking at the breakdown of pronouns used for each major.
+```
+
+Pick a major to see the pronoun distribution within it!
+
+column{data-width = 500}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Pronouns Used by Major Field", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(selectInput("field", 
+                       label = "Major Field",
+                       choices = c("Humanities" = "humanities", "Music" = "music", "Social Science" = "social_science", "Stem" = "stem")),
+           checkboxInput("check1", "Percentage", value = FALSE))
+
+#Here we created a dropdown menu where you can chose which major field to look at, and a checkbox where you can see the percentages rather than raw numbers. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+  if(!input$check1)
+    directory3 %>%
+      group_by(field, gender) %>%
+      filter(field == input$field) %>%
+      summarize(n = n()) %>%
+      ggplot(aes(x = field, y = n, fill = gender)) +
+        geom_col(position = "dodge") +
+        labs(x = "Field",
+             y = "Number of Students",
+             fill = "Pronouns Used") + 
+        scale_fill_manual(values = c("#DE9F00", "#616161", "#FFD15C", "#DEDEDE")) +
+        theme_bw() +
+        theme(legend.position = "bottom", 
+              legend.title = element_blank())
+  else if(input$check1)
+    directory3 %>%
+      group_by(field, gender) %>%
+      filter(field == input$field) %>%
+      summarize(n = n()) %>%
+      ggplot(aes(x = field, y = (n / sum(n)), fill = gender)) +
+        geom_col(position = "dodge") +
+        labs(x = "Field",
+             y = "Percentage of Students",
+             fill = "Pronouns Used") + 
+        scale_y_continuous(labels = scales::percent) +
+        scale_fill_manual(values = c("#DE9F00", "#616161", "#FFD15C", "#DEDEDE")) +
+        theme_bw() +
+        theme(legend.position = "bottom", 
+              legend.title = element_blank())})
+
+#This code creates a bar chart looking at the breakdown of pronouns used for each major field.
+```
+
+Pick a field to see the pronoun distribution within it! 
+
+The number of students that use she/her pronouns is highest in every field, but is closest to the number of students that use he/him in Music. Among students in STEM, there are nearly 150 more students that use she/her than that use he/him, though it's important to note that there is a large number of NAs in this field. 
+
+column{data-width = 500}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Pronouns Used by Major Load", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(selectInput("major_c", 
+                       label = "Major",
+                       choices = c("American Studies", "Ancient Studies", "Art History", "Asian Studies", "Biology", "Chemistry", "Chinese", "Church Music", "Classics", "Composition", "Computer Science", "Creative Writing", "Dance", "Economics", "Education", "Elective Studies", "English", "Environmental Studies", "Exercise Science", "Film and Media Studies", "French", "Gender & Sexuality Studies", "German", "Greek", "History", "Individual Major", "Japanese", "Kinesiology", "Latin", "Latin American Studies", "Mathematics", "Medieval Studies", "Music", "Music Education", "Nordic Studies", "Norwegian", "Nursing", "Performance", "Philosophy", "Physics", "Political Science", "Psychology", "Quantitative Economics", "Race and Ethnic Studies", "Religion", "Russian", "Russian Area Studies", "Social Studies Education", "Social Work", "Sociology/Anthropology", "Spanish", "Studio Art", "Theater"), 
+                       selected = "Mathematics"), 
+           checkboxInput("type_check_b", "Percentage", value = FALSE ))
+
+#Here we created a dropdown menu where you can chose which major to look at, and a checkbox where you can see the percentages rather than raw numbers. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+if (!input$type_check_b) 
+  directory_data %>% 
+    filter(major1 == input$major_c | input$major_c == major2 | input$major_c == major3) %>%
+    filter(major1 != "Undecided") %>%
+    mutate(major_num = ifelse(is.na(major2), "Single", ifelse(is.na(major3), "Double", "Triple"))) %>%
+    ggplot() +
+      geom_bar(aes(x = major_num, fill = gender)) +
+      labs(x = "Major Load", 
+           y = "Number of Students", 
+           fill = "Pronouns Used") +
+        scale_fill_manual(values = c("#DE9F00", "#616161", "#FFD15C", "#DEDEDE"))+
+    scale_x_discrete(limits = c("Single", "Double", "Triple"))+
+    theme_bw()+
+    theme(legend.position = "bottom", 
+          legend.title = element_blank())
+  else if (input$type_check_b) 
+    directory_data %>% 
+      filter(major1 == input$major_c | input$major_c == major2 | input$major_c == major3)%>%
+      filter(major1 != "Undecided") %>%
+      mutate(major_num = ifelse(is.na(major2), "Single", ifelse(is.na(major3), "Double", "Triple"))) %>%
+      ggplot() +
+        geom_bar(aes(x = major_num, fill = gender), position = "fill") +
+        labs(x = "Major Load", 
+             y = "Percentage of Students") + 
+        scale_y_continuous(labels = scales::percent) +
+        scale_x_discrete(limits = c("Single", "Double", "Triple"))+
+        scale_fill_manual(values = c("#DE9F00", "#616161", "#FFD15C", "#DEDEDE")) +
+        theme_bw() +
+        theme(legend.title = element_blank(),
+              legend.position = "bottom")
+        }) 
+
+#This code creates a bar chart looking at the breakdown of pronouns used by major load.
+```
+
+From this plot we can see how the proportion of the students' pronouns changes as major load increases. There are a couple of interesting patterns to note. In many cases it seems like as the major load changes from single to double to triple, the proportion of students with either she/her pronouns or that don't have their pronouns listed increases.
+
+column{data-width = 500}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Pronouns Used by Overall Major Load", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(radioButtons("button", "Major Load", c("Single Majors" = "single", "Double Majors" = "double", "Triple Majors" = "triple"))) 
+           
+#Here we added a button where you can select the major load to look at. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+if (input$button == "single") 
+  directory_data %>%
+    filter(is.na(major2)) %>%
+    group_by(gender) %>%
+    summarize(n = n()) %>%
+    ggplot() +
+      geom_bar(aes(x = gender,  y = n, fill = "color"), stat = "identity") +
+          labs(x = "Pronouns Used",
+               y = "Number of Students") +
+          scale_fill_manual(values = color1) +
+          scale_x_discrete(labels = c("he/him", "she/her", "they/them or\nmultiple pronouns", "NA")) +
+          theme_bw() +
+          theme(legend.position = "none")
+  else if (input$button == "double") 
+    directory_data %>%
+    filter(!is.na(major2)) %>%
+    group_by(gender) %>%
+    summarize(n = n()) %>%
+    ggplot() +
+      geom_bar(aes(x = gender,  y = n, fill = "color"), stat = "identity") +
+          labs(x = "Pronouns Used",
+               y = "Number of Students") +
+          scale_fill_manual(values = color1) +
+          scale_x_discrete(labels = c("he/him", "she/her", "they/them or\nmultiple pronouns", "NA")) +
+          theme_bw() +
+          theme(legend.position = "none")
+    else if (input$button == "triple") 
+      directory_data %>%
+      filter(!is.na(major3)) %>%
+      group_by(gender) %>%
+      summarize(n = n()) %>%
+      ggplot() +
+        geom_bar(aes(x = gender,  y = n, fill = "color"), stat = "identity") +
+            labs(x = "Pronouns Used",
+               y = "Number of Students") +
+            scale_fill_manual(values = color1) +
+            scale_x_discrete(labels = c("he/him", "she/her", "they/them or\nmultiple pronouns", "NA")) +
+            theme_bw() +
+            theme(legend.position = "none")}) 
+
+#This code creates a bar chart looking at the breakdown of pronouns used by major load.
+```
+
+She/her pronouns are most the common pronouns for single double and triple majors, most likely because they make up the largest number of students whose pronouns are listed on the directory. Additionally, as of now, the gap between the number of students that use she/her pronouns and that use he/him pronouns gets larger as the major load gets higher. Even if we assumed that every single one of the students listed as NA used he/him pronouns, the number of students using he/him pronouns would only be slightly greater than the number of students using she/her pronouns. As a result, it seems that there is a very good likelihood that students on campus with more than one major predominantly use she/her pronouns. 
+
+Majors & Housing
+==========================
+
+column{data-width = 500}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Double Majors by Housing", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(selectInput("field1", 
+                       label = "First Field of Study",
+                       choices = c("Humanities" = "humanities", "STEM" = "stem", "Social Science" = "social_science", "Music" = "music")), 
+           selectInput("field2", 
+                       label = "Second Field of Study",
+                       choices = c("Humanities" = "humanities", "STEM" = "stem", "Social Science" = "social_science", "Music" = "music")))
+
+#Here we created two dropdown menus where you can chose which major fields to look at. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+  directory_data %>%
+    filter(!is.na(major2)) %>%
+    filter(field1 == input$field1 & field2 == input$field2 | field1 == input$field1 & field3 == input$field2 |field2 == input$field1 & field3 == input$field2|field2 == input$field1 & field1 == input$field2|field3 == input$field1 &field2 == input$field2|field3 == input$field1 &field1 == input$field2) %>%
+    ggplot(aes(x = housing, fill = "color")) +
+      geom_bar() +
+      labs(x = "Number of Students",
+           y = "Housing") +
+      scale_fill_manual(values = color1) +
+      theme_bw() +
+      coord_flip() +
+      theme_bw() +
+      theme(legend.position = "none")})
+
+#This code creates a bar chart looking at the number of double majors in each dorm by their major fields.
+```
+
+Check out where people who have double majors live by their fields of study! What does the composition of your dorm look like? 
+
+
+
+column{data-width = 500}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Field by Housing", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(selectInput("housing2", 
+                       label = "Housing",
+                       choices = c("Larson Hall", "Ellingson Hall", "Hilleboe Hall", "Kittelsby Hall", "Hoyme Hall", "Kildahl Hall", "Larson Hall", "Mellby Hall", "Mohn Hall", "Rand Hall", "Thorson Hall", "Ytterboe Hall", "Off Campus", "Honor/Language House"), 
+                       selected = "Ytterboe Hall"), 
+           checkboxInput("check2", "Percentage", value = FALSE))
+
+#Here we created a dropdown menu where you can chose which housing option to look at, and a checkbox where you can see the percentages rather than raw numbers. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+  if(!input$check2) 
+   directory_data %>%
+  pivot_longer(cols = c(field1, field2, field3), names_to = "field_type", values_to = "field") %>%
+    group_by(housing, field) %>%
+    filter(housing == input$housing2, !is.na(field)) %>%
+    summarize(n = n()) %>%
+    ggplot(aes(x = housing, y = n, fill = field)) +
+      geom_col(position = "dodge") +
+      labs(x = "Housing",
+           y = "Number of Students",
+           fill = "Field") + 
+    scale_fill_manual(values = c("#DE9F00", "#616161", "#FFD15C", "#DEDEDE")) +
+    theme_bw()
+  else if (input$check2)
+     directory_data %>%
+      pivot_longer(cols = c(field1, field2, field3), names_to = "field_type", values_to = "field") %>%
+      filter(!is.na(field)) %>%
+      group_by(field) %>%
+      mutate(total_field = sum(!is.na(field))) %>%
+      filter(housing == input$housing2) %>%
+      mutate(housing_field = n(),
+             percent = housing_field / total_field) %>%
+      ggplot(aes(x = housing, y = percent, fill = field)) +
+        geom_col(position = "dodge") +
+        labs(x = "Housing",
+            y = "Percentage of Students",
+            fill = "Field") + 
+        scale_y_continuous(labels = scales::percent) +
+        scale_fill_manual(values = c("#DE9F00", "#616161", "#FFD15C", "#DEDEDE")) +
+        theme_bw() +
+        theme(plot.caption = element_text(hjust = 0.5))})
+
+#This code creates a bar chart looking at the breakdown of students living in each residence hall based on their major field.
+```
+
+The percentage represents the students in that field who live in that specific residence hall/honor houses/off campus.
+
+Take a look at first year residence halls and see which fields are declaring early! 
+
+
+Field & States
+==========================
+column{data-length=600}
+-------------------------
+
+```{r, echo = FALSE}
+titlePanel(h1("Major Field Distribution Among Domestic Students", align = "center"))
+```
+
+```{r, echo = FALSE}
+inputPanel(selectInput("field_d",
+                       label = "Field of Study",
+                       choices = c("Humanities" = "humanities", "STEM" = "stem", "Social Science" = "social_science", "Music" = "music")), 
+           checkboxInput("type_check_c", "Remove MN", value = FALSE ))
+
+#Here we created a dropdown menu where you can chose which major field to look at, and a checkbox that removes the observations of students from MN. 
+```
+
+```{r, echo = FALSE}
+renderPlot({
+if (!input$type_check_c)
+  directory_data %>%
+    filter(major1 != "Undecided") %>%
+    pivot_longer(c(field1, field2, field3), names_to ="field_type", values_to = "field") %>%
+    filter(field == input$field_d) %>%
+    group_by(state) %>%
+    count() %>%
+    right_join(states, by = c("state" = "abbr")) %>%
+    mutate(n = ifelse(is.na(n), 0 , n))%>%
+    ggplot(mapping = aes(x = long, y = lat, group = group, fill = "color")) + 
+      geom_polygon(aes(fill = n), color = "black") +
+      labs(fill = "Number of Students") +
+      scale_fill_gradientn(colors = colfunc3(10)) +
+      theme_bw() +
+      theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank())
+  else if (input$type_check_c)
+    directory_data %>%
+      filter(major1 != "Undecided") %>%
+      pivot_longer(c(field1, field2, field3), names_to ="field_type", values_to = "field") %>%
+      filter(field == input$field_d, state != "MN") %>%
+      group_by(state) %>%
+      count() %>%
+      right_join(states, by = c("state" = "abbr")) %>%
+      mutate(n = ifelse(is.na(n), 0 , n))%>%
+      ggplot(mapping = aes(x = long, y = lat, group = group)) + 
+        geom_polygon(aes(fill = n), color = "black") +
+        labs(fill = "Number of Students") +
+        scale_fill_gradientn(colors = colfunc3(10)) +
+        theme_bw() +
+        theme(axis.title.x = element_blank(),
+              axis.title.y = element_blank())})
+
+#This code creates a map of the United States that shows the number of students from each state based on their major field.
+```
+
+Pick a field to see how many people from that state are majoring in that field! 
+
+Since St. Olaf has such a high number of students from in-state (Minnesota), we have the option to remove Minnesota as an outlier so you can more easily see the variation of other states.
